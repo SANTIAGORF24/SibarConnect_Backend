@@ -2,6 +2,7 @@ import httpx
 import json
 from typing import Dict, Any
 from app.schemas.companies.company import YCloudTestResult
+from app.core.config import settings
 
 
 class YCloudService:
@@ -120,6 +121,21 @@ class YCloudService:
             if message_type == "text":
                 payload["text"] = {
                     "body": message
+                }
+            elif message_type == "sticker":
+                # Para stickers, convertir ruta local a URL pública accesible
+                sticker_url = message
+                if message.startswith('/media/'):
+                    # Convertir ruta local a URL pública (ngrok)
+                    sticker_url = f"{settings.public_url}{message}"
+                elif not message.startswith(('http://', 'https://')):
+                    # Si no es una URL completa, asumir que es ruta local
+                    sticker_url = f"{settings.public_url}{message}"
+                
+                print(f"🔗 Sticker URL construida: {sticker_url}")
+                
+                payload["sticker"] = {
+                    "link": sticker_url
                 }
             else:
                 # Para otros tipos de mensajes en el futuro

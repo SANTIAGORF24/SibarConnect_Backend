@@ -1,6 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 import os
 from .core.config import settings
 from .db.session import Base, engine
@@ -102,11 +103,24 @@ def create_app() -> FastAPI:
 
   app = FastAPI(title=settings.app_name)
 
-  # Configurar archivos estáticos para multimedia
+  # Endpoint específico para archivos webp con tipo MIME correcto (ANTES del mount)
+  @app.get("/media/{company_id}/stickers/{filename}")
+  async def serve_sticker(company_id: str, filename: str):
+    media_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "media")
+    file_path = os.path.join(media_dir, company_id, "stickers", filename)
+    
+    if os.path.exists(file_path) and filename.endswith('.webp'):
+      return FileResponse(file_path, media_type="image/webp")
+    else:
+      from fastapi import HTTPException
+      raise HTTPException(status_code=404, detail="File not found")
+
+  # Configurar archivos estáticos para multimedia (otros archivos)
   # La carpeta media está en la raíz del proyecto (un nivel arriba del directorio backend)
   media_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "media")
   if not os.path.exists(media_dir):
     os.makedirs(media_dir, exist_ok=True)
+  
   app.mount("/media", StaticFiles(directory=media_dir), name="media")
 
   app.add_middleware(

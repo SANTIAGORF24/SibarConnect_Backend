@@ -1,10 +1,17 @@
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Cargar variables de entorno desde .env
+load_dotenv()
 
 
 class Settings:
   app_name: str = os.getenv("APP_NAME", "SibarConnect API")
   api_prefix: str = os.getenv("API_PREFIX", "/api")
+  server_url: str = os.getenv("SERVER_URL", "http://localhost:8000")
+  # URL pública para recursos (usar ngrok cuando esté disponible)
+  public_url: str = os.getenv("PUBLIC_URL", os.getenv("SERVER_URL", "http://localhost:8000"))
 
   # Usar ruta absoluta para la base de datos
   @property

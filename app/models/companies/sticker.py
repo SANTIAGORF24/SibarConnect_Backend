@@ -10,7 +10,9 @@ class CompanySticker(Base):
     company_id: Mapped[int] = mapped_column(Integer, ForeignKey("companies.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     file_path: Mapped[str] = mapped_column(String(500), nullable=False)
-    file_url: Mapped[str] = mapped_column(String(500), nullable=True)
+    url: Mapped[str] = mapped_column(String(500), nullable=False)
+    file_size: Mapped[int] = mapped_column(Integer, nullable=True)
+    mime_type: Mapped[str] = mapped_column(String(100), nullable=True)
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     # Relaciones

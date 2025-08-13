@@ -13,6 +13,7 @@ from .api.routes.companies.companies import router as companies_router
 from .api.routes.companies.stickers import router as stickers_router
 from .api.routes.webhooks.ycloud import router as webhooks_router
 from .api.routes.chats.chats import router as chats_router
+from .api.routes.chats.realtime import router as chats_realtime_router
 from .api.routes.media import router as media_router
 from sqlalchemy import text
 
@@ -126,7 +127,7 @@ def create_app() -> FastAPI:
   app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
   )
@@ -136,6 +137,7 @@ def create_app() -> FastAPI:
   app.include_router(companies_router, prefix=settings.api_prefix)
   app.include_router(roles_router, prefix=settings.api_prefix)
   app.include_router(chats_router, prefix=f"{settings.api_prefix}/chats")
+  app.include_router(chats_realtime_router, prefix=f"{settings.api_prefix}/chats")
   app.include_router(stickers_router, prefix=f"{settings.api_prefix}/chats/stickers")
   app.include_router(webhooks_router, prefix=f"{settings.api_prefix}/webhooks")
   app.include_router(media_router, prefix=settings.api_prefix)

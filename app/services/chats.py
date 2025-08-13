@@ -3,6 +3,8 @@ from sqlalchemy import desc, func
 from typing import List, Optional
 from app.models.chats.chat import Chat, Message
 from app.schemas.chats.chat import ChatCreate, MessageCreate, ChatOut, MessageOut, ChatWithLastMessage
+from app.services.realtime import manager
+from fastapi.encoders import jsonable_encoder
 
 
 def get_chats_by_company(db: Session, company_id: int) -> List[ChatWithLastMessage]:
@@ -124,6 +126,39 @@ def create_message(db: Session, message_data: MessageCreate) -> Message:
     
     db.commit()
     db.refresh(message)
+
+    try:
+        company_id = chat.company_id if chat else None
+        if company_id is not None:
+            payload = jsonable_encoder(MessageOut.from_orm(message))
+            # Agregar company_id para que el frontend pueda validar
+            payload["company_id"] = company_id
+            # Emitir evento a los clientes del chat
+            import anyio
+            async def _broadcast() -> None:
+                await manager.broadcast_to_chat(company_id, message.chat_id, "message.created", payload)
+                # Emitir actualización a nivel de empresa para refrescar lista de chats
+                await manager.broadcast_to_company(company_id, "chat.updated", {
+                    "chat_id": message.chat_id,
+                    "company_id": company_id,
+                    "last_message": payload
+                })
+            try:
+                anyio.from_thread.run(_broadcast)
+            except RuntimeError:
+                # Si ya estamos en un loop async, ejecutar directamente
+                import asyncio
+                async def _broadcast_asyncio() -> None:
+                    await manager.broadcast_to_chat(company_id, message.chat_id, "message.created", payload)
+                    await manager.broadcast_to_company(company_id, "chat.updated", {
+                        "chat_id": message.chat_id,
+                        "company_id": company_id,
+                        "last_message": payload
+                    })
+                asyncio.create_task(_broadcast_asyncio())
+    except Exception:
+        # Evitar que errores de broadcast rompan la creación del mensaje
+        pass
     return message
 
 

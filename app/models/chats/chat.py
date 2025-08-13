@@ -13,6 +13,7 @@ class Chat(Base):
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
     assigned_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Agente asignado
     status = Column(String(20), default="active")  # active, closed, pending
+    priority = Column(String(10), default="low")  # low, medium, high
     last_message_time = Column(DateTime(timezone=True), server_default=func.now())
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -21,6 +22,31 @@ class Chat(Base):
     company = relationship("Company", back_populates="chats")
     assigned_user = relationship("User")
     messages = relationship("Message", back_populates="chat", order_by="Message.created_at")
+
+
+class ChatSummary(Base):
+    __tablename__ = "chat_summaries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    chat_id = Column(Integer, ForeignKey("chats.id"), nullable=False)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
+    summary = Column(Text, nullable=False)
+    interest = Column(String(20), default="Indeciso")  # Interesado, No interesado, Indeciso
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    provider = Column(String(50), default="gemini")
+    model = Column(String(50), default="gemini-2.5-flash")
+
+
+class Appointment(Base):
+    __tablename__ = "appointments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
+    chat_id = Column(Integer, ForeignKey("chats.id"), nullable=False)
+    assigned_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    start_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class Message(Base):

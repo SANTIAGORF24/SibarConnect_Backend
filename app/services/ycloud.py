@@ -102,7 +102,7 @@ class YCloudService:
             response.raise_for_status()
             return response.json()
     
-    async def send_message(self, to: str, message: str, from_number: str, message_type: str = "text") -> Dict[str, Any]:
+    async def send_message(self, to: str, message: str, from_number: str, message_type: str = "text", caption: str | None = None) -> Dict[str, Any]:
         """Envía un mensaje de WhatsApp"""
         try:
             # Formatear número de teléfono (asegurar que tenga formato internacional)
@@ -137,11 +137,18 @@ class YCloudService:
                 payload["sticker"] = {
                     "link": sticker_url
                 }
+            elif message_type in ("image", "video", "audio", "document"):
+                media_url = message
+                if message.startswith('/media/'):
+                    media_url = f"{settings.public_url}{message}"
+                elif not message.startswith(('http://', 'https://')):
+                    media_url = f"{settings.public_url}{message}"
+                payload[message_type] = {"link": media_url}
+                if caption:
+                    # YCloud soporta caption en image/video/audio/document
+                    payload[message_type]["caption"] = caption
             else:
-                # Para otros tipos de mensajes en el futuro
-                payload["text"] = {
-                    "body": message
-                }
+                payload["text"] = {"body": message}
             
             print(f"Enviando mensaje desde {from_number} a {to}: {message}")
             print(f"Payload: {json.dumps(payload, indent=2)}")

@@ -37,6 +37,7 @@ class ChatBase(BaseModel):
     phone_number: str
     customer_name: Optional[str] = None
     status: str = "active"
+    priority: str = "low"
 
 
 class ChatCreate(ChatBase):
@@ -78,3 +79,31 @@ class SendMessageRequest(BaseModel):
     chat_id: int
     content: str
     message_type: str = "text"
+
+
+class SendMediaLinkRequest(BaseModel):
+    chat_id: int
+    media_url: str
+    message_type: str
+    caption: Optional[str] = None
+
+
+class ChatAssignRequest(BaseModel):
+    chat_id: int
+    assigned_user_id: int
+    priority: str
+
+
+class ChatStatusUpdate(BaseModel):
+    chat_id: int
+    status: str
+
+
+class CreateAppointmentRequest(BaseModel):
+    chat_id: int
+    assigned_user_id: int
+    start_at: datetime
+
+
+class CreateSummaryRequest(BaseModel):
+    chat_id: int

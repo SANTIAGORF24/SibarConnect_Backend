@@ -15,6 +15,7 @@ from .api.routes.webhooks.ycloud import router as webhooks_router
 from .api.routes.chats.chats import router as chats_router
 from .api.routes.chats.realtime import router as chats_realtime_router
 from .api.routes.media import router as media_router
+from .api.routes.templates.templates import router as templates_router
 from sqlalchemy import text
 
 
@@ -57,6 +58,14 @@ def create_app() -> FastAPI:
             FOREIGN KEY (company_id) REFERENCES companies (id)
           )
         """)
+      # Asegurar columnas nuevas en chats
+      try:
+        info = conn.exec_driver_sql("PRAGMA table_info('chats')").fetchall()
+        cols = [row[1] for row in info]
+        if 'priority' not in cols:
+          conn.exec_driver_sql("ALTER TABLE chats ADD COLUMN priority VARCHAR(10) DEFAULT 'low'")
+      except Exception:
+        pass
         
       try:
         conn.exec_driver_sql("SELECT 1 FROM messages LIMIT 1")
@@ -79,6 +88,59 @@ def create_app() -> FastAPI:
             FOREIGN KEY (user_id) REFERENCES users (id)
           )
         """)
+
+      # Tabla de resúmenes
+      try:
+        conn.exec_driver_sql("SELECT 1 FROM chat_summaries LIMIT 1")
+      except Exception:
+        conn.exec_driver_sql("""
+          CREATE TABLE IF NOT EXISTS chat_summaries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER NOT NULL,
+            company_id INTEGER NOT NULL,
+            summary TEXT NOT NULL,
+            interest VARCHAR(20) DEFAULT 'Indeciso',
+            provider VARCHAR(50) DEFAULT 'gemini',
+            model VARCHAR(50) DEFAULT 'gemini-2.5-flash',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP,
+            FOREIGN KEY (chat_id) REFERENCES chats (id),
+            FOREIGN KEY (company_id) REFERENCES companies (id)
+          )
+        """)
+      # Asegurar columna 'interest' por si existía estructura previa
+      try:
+        info = conn.exec_driver_sql("PRAGMA table_info('chat_summaries')").fetchall()
+        cols = [row[1] for row in info]
+        if 'interest' not in cols:
+          conn.exec_driver_sql("ALTER TABLE chat_summaries ADD COLUMN interest VARCHAR(20) DEFAULT 'Indeciso'")
+        if 'provider' not in cols:
+          conn.exec_driver_sql("ALTER TABLE chat_summaries ADD COLUMN provider VARCHAR(50) DEFAULT 'gemini'")
+        if 'model' not in cols:
+          conn.exec_driver_sql("ALTER TABLE chat_summaries ADD COLUMN model VARCHAR(50) DEFAULT 'gemini-2.5-flash'")
+        if 'updated_at' not in cols:
+          conn.exec_driver_sql("ALTER TABLE chat_summaries ADD COLUMN updated_at TIMESTAMP")
+      except Exception:
+        pass
+
+      # Tabla de citas
+      try:
+        conn.exec_driver_sql("SELECT 1 FROM appointments LIMIT 1")
+      except Exception:
+        conn.exec_driver_sql("""
+          CREATE TABLE IF NOT EXISTS appointments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_id INTEGER NOT NULL,
+            chat_id INTEGER NOT NULL,
+            assigned_user_id INTEGER NOT NULL,
+            start_at TIMESTAMP NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (company_id) REFERENCES companies (id),
+            FOREIGN KEY (chat_id) REFERENCES chats (id),
+            FOREIGN KEY (assigned_user_id) REFERENCES users (id),
+            UNIQUE (assigned_user_id, start_at)
+          )
+        """)
         
       # Verificar y crear tabla de stickers si no existe
       try:
@@ -96,6 +158,36 @@ def create_app() -> FastAPI:
             file_size INTEGER,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (company_id) REFERENCES companies (id)
+          )
+        """)
+      # Verificar y crear tablas de templates si no existen
+      try:
+        conn.exec_driver_sql("SELECT 1 FROM templates LIMIT 1")
+      except Exception:
+        conn.exec_driver_sql("""
+          CREATE TABLE IF NOT EXISTS templates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_id INTEGER NOT NULL,
+            name VARCHAR(255) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP,
+            FOREIGN KEY (company_id) REFERENCES companies (id)
+          )
+        """)
+      try:
+        conn.exec_driver_sql("SELECT 1 FROM template_items LIMIT 1")
+      except Exception:
+        conn.exec_driver_sql("""
+          CREATE TABLE IF NOT EXISTS template_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            template_id INTEGER NOT NULL,
+            order_index INTEGER NOT NULL DEFAULT 0,
+            item_type VARCHAR(20) NOT NULL,
+            text_content TEXT,
+            media_url VARCHAR(500),
+            mime_type VARCHAR(100),
+            caption VARCHAR(500),
+            FOREIGN KEY (template_id) REFERENCES templates (id)
           )
         """)
         
@@ -141,6 +233,7 @@ def create_app() -> FastAPI:
   app.include_router(stickers_router, prefix=f"{settings.api_prefix}/chats/stickers")
   app.include_router(webhooks_router, prefix=f"{settings.api_prefix}/webhooks")
   app.include_router(media_router, prefix=settings.api_prefix)
+  app.include_router(templates_router, prefix=f"{settings.api_prefix}/templates")
 
   return app
 

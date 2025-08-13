@@ -12,6 +12,8 @@ class Settings:
   server_url: str = os.getenv("SERVER_URL", "http://localhost:8000")
   # URL pública para recursos (usar ngrok cuando esté disponible)
   public_url: str = os.getenv("PUBLIC_URL", os.getenv("SERVER_URL", "http://localhost:8000"))
+  deepseek_api_key: str | None = os.getenv("DEEPSEEK_API_KEY")
+  gemini_api_key: str | None = os.getenv("GEMINI_API_KEY")
 
   # Usar ruta absoluta para la base de datos
   @property

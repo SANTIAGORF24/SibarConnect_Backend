@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
 from typing import List, Optional
-from app.models.chats.chat import Chat, Message
+from app.models.chats.chat import Chat, Message, ChatSummary, Appointment
 from app.schemas.chats.chat import ChatCreate, MessageCreate, ChatOut, MessageOut, ChatWithLastMessage
 from app.services.realtime import manager
 from fastapi.encoders import jsonable_encoder
@@ -46,6 +46,7 @@ def get_chats_by_company(db: Session, company_id: int) -> List[ChatWithLastMessa
             phone_number=chat.phone_number,
             customer_name=chat.customer_name,
             status=chat.status,
+            priority=chat.priority,
             company_id=chat.company_id,
             assigned_user_id=chat.assigned_user_id,
             last_message_time=chat.last_message_time,
@@ -90,7 +91,8 @@ def get_or_create_chat(db: Session, phone_number: str, company_id: int, customer
         phone_number=phone_number,
         customer_name=customer_name,
         company_id=company_id,
-        status="active"
+        status="active",
+        priority="low"
     )
     
     db.add(new_chat)
@@ -160,6 +162,144 @@ def create_message(db: Session, message_data: MessageCreate) -> Message:
         # Evitar que errores de broadcast rompan la creación del mensaje
         pass
     return message
+
+
+def assign_chat(db: Session, company_id: int, chat_id: int, assigned_user_id: int, priority: str) -> Optional[Chat]:
+    chat = (
+        db.query(Chat)
+        .filter(Chat.id == chat_id, Chat.company_id == company_id)
+        .first()
+    )
+    if not chat:
+        return None
+    chat.assigned_user_id = assigned_user_id
+    chat.priority = priority
+    db.commit()
+    db.refresh(chat)
+    return chat
+
+
+def update_chat_status(db: Session, company_id: int, chat_id: int, status: str) -> Optional[Chat]:
+    chat = (
+        db.query(Chat)
+        .filter(Chat.id == chat_id, Chat.company_id == company_id)
+        .first()
+    )
+    if not chat:
+        return None
+    chat.status = status
+    db.commit()
+    db.refresh(chat)
+    return chat
+
+
+def create_appointment(db: Session, company_id: int, chat_id: int, assigned_user_id: int, start_at) -> Appointment | None:
+    exists = (
+        db.query(Appointment)
+        .filter(
+            Appointment.company_id == company_id,
+            Appointment.assigned_user_id == assigned_user_id,
+            Appointment.start_at == start_at,
+        )
+        .first()
+    )
+    if exists:
+        return None
+    appt = Appointment(
+        company_id=company_id,
+        chat_id=chat_id,
+        assigned_user_id=assigned_user_id,
+        start_at=start_at,
+    )
+    db.add(appt)
+    db.commit()
+    db.refresh(appt)
+    return appt
+
+
+def save_chat_summary(db: Session, company_id: int, chat_id: int, summary: str, interest: str, provider: str = "gemini", model: str = "gemini-2.5-flash") -> ChatSummary:
+    row = (
+        db.query(ChatSummary)
+        .filter(ChatSummary.company_id == company_id, ChatSummary.chat_id == chat_id)
+        .first()
+    )
+    if row:
+        row.summary = summary
+        row.interest = interest
+        row.provider = provider
+        row.model = model
+    else:
+        row = ChatSummary(
+            company_id=company_id,
+            chat_id=chat_id,
+            summary=summary,
+            interest=interest,
+            provider=provider,
+            model=model,
+        )
+        db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+def get_chat_summary(db: Session, company_id: int, chat_id: int) -> ChatSummary | None:
+    return (
+        db.query(ChatSummary)
+        .filter(ChatSummary.company_id == company_id, ChatSummary.chat_id == chat_id)
+        .first()
+    )
+
+
+def list_appointments_by_chat(db: Session, company_id: int, chat_id: int) -> list[Appointment]:
+    return (
+        db.query(Appointment)
+        .filter(Appointment.company_id == company_id, Appointment.chat_id == chat_id)
+        .order_by(Appointment.start_at)
+        .all()
+    )
+
+
+def update_appointment(db: Session, company_id: int, appointment_id: int, *, assigned_user_id: int | None = None, start_at=None) -> Appointment | None:
+    appt = (
+        db.query(Appointment)
+        .filter(Appointment.company_id == company_id, Appointment.id == appointment_id)
+        .first()
+    )
+    if not appt:
+        return None
+    if assigned_user_id is not None:
+        appt.assigned_user_id = assigned_user_id
+    if start_at is not None:
+        # Validación de conflicto
+        exists = (
+            db.query(Appointment)
+            .filter(
+                Appointment.company_id == company_id,
+                Appointment.assigned_user_id == (assigned_user_id or appt.assigned_user_id),
+                Appointment.start_at == start_at,
+                Appointment.id != appointment_id,
+            )
+            .first()
+        )
+        if exists:
+            return None
+        appt.start_at = start_at
+    db.commit()
+    db.refresh(appt)
+    return appt
+
+
+def delete_appointment(db: Session, company_id: int, appointment_id: int) -> bool:
+    appt = (
+        db.query(Appointment)
+        .filter(Appointment.company_id == company_id, Appointment.id == appointment_id)
+        .first()
+    )
+    if not appt:
+        return False
+    db.delete(appt)
+    db.commit()
+    return True
 
 
 def get_messages_by_chat(db: Session, chat_id: int, limit: int = 50) -> List[Message]:

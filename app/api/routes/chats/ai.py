@@ -1,28 +1,30 @@
 import json
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from app.db.session import get_db
 from app.services.chats import (
     get_messages_by_chat,
     save_chat_summary,
     get_chat_summary,
+    get_chat_by_id
 )
 from app.core.config import settings
-from google import genai as genai_client
+import google.genai as genai_client
 from google.genai import types as genai_types
 from app.schemas.chats.chat import (
     CreateSummaryRequest,
     ChatInsightsRequest,
     ChatInsightsOut,
     AssistDraftRequest,
-    AssistDraftOut,
+    AssistDraftOut
 )
 
 router = APIRouter(prefix="/ai")
 
+summaries_router = APIRouter()
 
-@router.post("/summaries/generate")
+@summaries_router.post("/summaries/generate")
 async def generate_summary_endpoint(
     data: CreateSummaryRequest,
     company_id: int,
@@ -84,7 +86,7 @@ async def generate_summary_endpoint(
     }
 
 
-@router.get("/summaries/{chat_id}")
+@summaries_router.get("/summaries/{chat_id}")
 def get_summary_endpoint(
     chat_id: int,
     company_id: int,

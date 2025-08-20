@@ -2,149 +2,167 @@
 
 ## Descripción General
 
-Backend de la aplicación SibarConnect desarrollado en FastAPI con Python. Proporciona APIs para gestión de chats, usuarios, empresas y análisis de inteligencia artificial.
+Backend de la aplicación SibarConnect desarrollado con FastAPI, proporcionando APIs para gestión de chats, usuarios, empresas y funcionalidades de IA.
 
 ## Estructura del Proyecto
 
 ### 📁 Directorios Principales
 
-#### `/app/` - Aplicación principal
+- `app/` - Código principal de la aplicación
+- `data/` - Base de datos SQLite
+- `media/` - Archivos multimedia (stickers, templates, uploads)
+- `scripts/` - Scripts de utilidad y migración
+- `tests/` - Pruebas unitarias
 
-- **`/api/`** - Endpoints de la API REST
-- **`/core/`** - Configuración y utilidades centrales
-- **`/db/`** - Configuración de base de datos
-- **`/models/`** - Modelos de SQLAlchemy
-- **`/schemas/`** - Esquemas Pydantic para validación
-- **`/services/`** - Lógica de negocio
+### 🔧 Configuración
 
-#### `/data/` - Base de datos SQLite
+- **Base de datos**: SQLite con archivo `app.db`
+- **Puerto**: 8000 (por defecto)
+- **API Prefix**: `/api`
 
-- **`app.db`** - Base de datos principal
+## 🚀 Rutas de la API
 
-#### `/media/` - Archivos multimedia
+### 🔐 Autenticación (`/api`)
 
-- **`/company_1/`** - Archivos por empresa
-  - **`/uploads/`** - Archivos subidos por usuarios
-  - **`/whatsapp/`** - Archivos de WhatsApp
-  - **`/stickers/`** - Stickers personalizados
-  - **`/templates/`** - Plantillas de mensajes
+- **POST** `/login` - Inicio de sesión de usuario
 
-#### `/scripts/` - Scripts de utilidad
+### 👥 Usuarios (`/api`)
 
-- **`create_admin.py`** - Crear usuario administrador
-- **`create_stickers_table.py`** - Migración de tabla de stickers
-- **`migrate_add_attachment_url.py`** - Migración de URLs de adjuntos
-- **`migrate_ycloud.py`** - Migración de YCloud
+- **GET** `/users` - Listar usuarios
+- **POST** `/users` - Crear usuario
+- **GET** `/users/{user_id}` - Obtener usuario específico
+- **PUT** `/users/{user_id}` - Actualizar usuario
+- **DELETE** `/users/{user_id}` - Eliminar usuario
 
-## 🚀 API Endpoints
+### 🏢 Empresas (`/api`)
 
-### 🔐 Autenticación (`/api/auth/`)
+- **GET** `/companies` - Listar empresas
+- **POST** `/companies` - Crear empresa
+- **GET** `/companies/{company_id}` - Obtener empresa específica
+- **PUT** `/companies/{company_id}` - Actualizar empresa
+- **DELETE** `/companies/{company_id}` - Eliminar empresa
 
-- **`POST /login`** - Inicio de sesión de usuarios
+### 🎭 Roles (`/api`)
 
-### 💬 Chats (`/api/chats/`)
+- **GET** `/roles` - Listar roles
+- **POST** `/roles` - Crear rol
+- **GET** `/roles/{role_id}` - Obtener rol específico
+- **PUT** `/roles/{role_id}` - Actualizar rol
+- **DELETE** `/roles/{role_id}` - Eliminar rol
 
-- **`GET /`** - Obtener chats de una empresa con filtros
-- **`GET /{chat_id}`** - Obtener chat específico
-- **`POST /bulk`** - Actualización masiva de chats
-- **`POST /assign`** - Asignar chat a usuario
-- **`POST /status`** - Actualizar estado del chat
-- **`POST /pin`** - Fijar chat
-- **`POST /unpin`** - Desfijar chat
-- **`POST /snooze`** - Pausar chat
-- **`POST /unsnooze`** - Reanudar chat
+### 💬 Chats (`/api/chats`)
 
-### 🤖 Inteligencia Artificial (`/api/chats/ai/`)
+#### 📝 Mensajes
 
-- **`POST /insights`** - Generar insights del chat usando Gemini AI
-- **`GET /insights`** - Obtener insights existentes
-- **`POST /summaries/generate`** - Generar resumen del chat
-- **`GET /summaries/{chat_id}`** - Obtener resumen del chat
-- **`POST /assist-draft`** - Asistir en la redacción de mensajes
+- **GET** `/messages` - Listar mensajes de un chat
+- **POST** `/messages` - Enviar mensaje
+- **GET** `/messages/{message_id}` - Obtener mensaje específico
+- **PUT** `/messages/{message_id}` - Actualizar mensaje
+- **DELETE** `/messages/{message_id}` - Eliminar mensaje
 
-### 📱 Mensajes (`/api/chats/messages/`)
+#### 🏷️ Tags y Notas
 
-- **`GET /{chat_id}`** - Obtener mensajes de un chat
-- **`POST /{chat_id}`** - Enviar mensaje
-- **`POST /{chat_id}/bulk`** - Enviar múltiples mensajes
+- **GET** `/tags-notes` - Listar tags y notas
+- **POST** `/tags-notes` - Crear tag o nota
+- **PUT** `/tags-notes/{id}` - Actualizar tag o nota
+- **DELETE** `/tags-notes/{id}` - Eliminar tag o nota
 
-### 🏢 Empresas (`/api/companies/`)
+#### 📅 Citas
 
-- **`GET /`** - Obtener información de la empresa
-- **`POST /stickers`** - Subir sticker personalizado
-- **`GET /stickers`** - Obtener stickers de la empresa
+- **GET** `/appointments` - Listar citas
+- **POST** `/appointments` - Crear cita
+- **PUT** `/appointments/{id}` - Actualizar cita
+- **DELETE** `/appointments/{id}` - Eliminar cita
 
-### 👥 Usuarios (`/api/users/`)
+#### 🎯 Gestión
 
-- **`GET /`** - Obtener usuarios de la empresa
-- **`POST /`** - Crear nuevo usuario
-- **`GET /{user_id}`** - Obtener usuario específico
-- **`PUT /{user_id}`** - Actualizar usuario
-- **`DELETE /{user_id}`** - Eliminar usuario
+- **GET** `/management` - Listar chats con filtros
+- **POST** `/management/start` - Iniciar chat
+- **PUT** `/management/{chat_id}` - Actualizar chat
+- **DELETE** `/management/{chat_id}` - Eliminar chat
 
-### 🔑 Roles (`/api/roles/`)
+#### 📁 Importaciones
 
-- **`GET /`** - Obtener roles disponibles
-- **`POST /`** - Crear nuevo rol
-- **`PUT /{role_id}`** - Actualizar rol
-- **`DELETE /{role_id}`** - Eliminar rol
+- **POST** `/imports/whatsapp` - Importar chats de WhatsApp
+- **POST** `/imports/media` - Importar archivos multimedia
 
-### 📋 Plantillas (`/api/templates/`)
+#### 🎨 Media
 
-- **`GET /`** - Obtener plantillas de mensajes
-- **`POST /`** - Crear nueva plantilla
-- **`PUT /{template_id}`** - Actualizar plantilla
-- **`DELETE /{template_id}`** - Eliminar plantilla
+- **POST** `/media/upload` - Subir archivo multimedia
+- **GET** `/media/{file_id}` - Obtener archivo multimedia
+- **DELETE** `/media/{file_id}` - Eliminar archivo multimedia
 
-### 🔄 Webhooks (`/api/webhooks/`)
+#### 🚀 Inicio de Chat
 
-- **`POST /ycloud`** - Webhook de YCloud para mensajes
+- **POST** `/start` - Iniciar nueva conversación
+
+#### 🤖 IA y Resúmenes
+
+- **POST** `/summaries/generate` - Generar resumen de chat
+- **GET** `/summaries/{chat_id}` - Obtener resumen de chat
+- **POST** `/ai/insights` - Generar insights del chat
+- **POST** `/ai/assist-draft` - Asistir en redacción de mensaje
+- **POST** `/ai/assist-reply` - Asistir en respuesta automática
+
+#### ⚡ Tiempo Real
+
+- **GET** `/realtime/ws` - WebSocket para actualizaciones en tiempo real
+
+### 🎨 Stickers (`/api/chats/stickers`)
+
+- **GET** `/stickers` - Listar stickers de empresa
+- **POST** `/stickers` - Crear sticker
+- **GET** `/stickers/{sticker_id}` - Obtener sticker específico
+- **PUT** `/stickers/{sticker_id}` - Actualizar sticker
+- **DELETE** `/stickers/{sticker_id}` - Eliminar sticker
+
+### 🔗 Webhooks (`/api/webhooks`)
+
+- **POST** `/ycloud` - Webhook de YCloud para WhatsApp
+
+### 📱 Media (`/api`)
+
+- **GET** `/media/{company_id}/stickers/{filename}` - Servir stickers
+- **GET** `/media/{company_id}/templates/{filename}` - Servir templates
+- **GET** `/media/{company_id}/uploads/{filename}` - Servir archivos subidos
+
+### 📋 Templates (`/api/templates`)
+
+- **GET** `/templates` - Listar templates
+- **POST** `/templates` - Crear template
+- **GET** `/templates/{template_id}` - Obtener template específico
+- **PUT** `/templates/{template_id}` - Actualizar template
+- **DELETE** `/templates/{template_id}` - Eliminar template
 
 ## 🗄️ Base de Datos
 
-### Modelos Principales
+### Tablas Principales
 
-- **`Chat`** - Conversaciones con clientes
-- **`Message`** - Mensajes individuales
-- **`User`** - Usuarios del sistema
-- **`Company`** - Empresas cliente
-- **`Role`** - Roles de usuario
-- **`Template`** - Plantillas de mensajes
-- **`ChatSummary`** - Resúmenes generados por IA
-- **`Appointment`** - Citas programadas
+- `users` - Usuarios del sistema
+- `companies` - Empresas registradas
+- `roles` - Roles y permisos
+- `chats` - Conversaciones de WhatsApp
+- `messages` - Mensajes individuales
+- `chat_summaries` - Resúmenes generados por IA
+- `templates` - Plantillas de contenido
+- `template_items` - Elementos de templates
+- `stickers` - Stickers de empresa
 
-## 🤖 Servicios de IA
+## 🔑 Variables de Entorno
 
-### Gemini AI Integration
+### Requeridas
 
-- **Análisis de sentimientos** - Clasificación positiva/neutral/negativa
-- **Detección de intenciones** - Compra, agendar, soporte, etc.
-- **Extracción de entidades** - Montos, fechas, nombres
-- **Sugerencias de acciones** - Próximos pasos recomendados
-- **Generación de respuestas** - Respuestas sugeridas
-- **Análisis de riesgo** - Probabilidad de abandono
+- `GEMINI_API_KEY` - Clave API de Google Gemini para IA
+- `DEEPSEEK_API_KEY` - Clave API de DeepSeek (opcional)
 
-## ⚙️ Configuración
+### Opcionales
 
-### Variables de Entorno Requeridas
-
-```bash
-# API Keys
-GEMINI_API_KEY=tu_api_key_de_gemini
-
-# Base de datos
-SQLITE_PATH=./data/app.db
-
-# Configuración del servidor
-APP_NAME=SibarConnect API
-API_PREFIX=/api
-SERVER_URL=http://localhost:8000
-PUBLIC_URL=http://localhost:8000
-
-# Usuario administrador
-ADMIN_EMAIL=admin@sibarconnect.com
-ADMIN_PASSWORD=admin123
-```
+- `APP_NAME` - Nombre de la aplicación (default: "SibarConnect API")
+- `API_PREFIX` - Prefijo de la API (default: "/api")
+- `SERVER_URL` - URL del servidor (default: "http://localhost:8000")
+- `PUBLIC_URL` - URL pública para recursos
+- `ADMIN_EMAIL` - Email del administrador
+- `ADMIN_PASSWORD` - Contraseña del administrador
 
 ## 🚀 Ejecución
 
@@ -160,67 +178,53 @@ pip install -r requirements.txt
 python run.py
 ```
 
-El servidor se ejecutará en `http://localhost:8000`
+### Scripts de Utilidad
 
-## 📊 Funcionalidades Principales
+- `create_admin.py` - Crear usuario administrador
+- `create_stickers_table.py` - Crear tabla de stickers
+- `migrate_add_attachment_url.py` - Migración para URLs de adjuntos
+- `migrate_ycloud.py` - Migración para YCloud
 
-### 1. Gestión de Chats
+## 🔍 Funcionalidades Principales
 
-- Creación y gestión de conversaciones
-- Asignación a agentes
-- Estados y prioridades
-- Sistema de etiquetas y notas
+### 💬 Gestión de Chats
 
-### 2. Análisis de IA
+- Importación automática desde WhatsApp
+- Resúmenes generados por IA
+- Sistema de tags y notas
+- Gestión de citas y recordatorios
 
-- Insights automáticos de conversaciones
-- Resúmenes inteligentes
-- Asistencia en redacción
-- Análisis de sentimientos
+### 🤖 Inteligencia Artificial
 
-### 3. Gestión de Usuarios
+- Generación de resúmenes con Gemini
+- Análisis de insights de conversaciones
+- Asistencia en redacción de mensajes
+- Respuestas automáticas inteligentes
 
-- Sistema de roles y permisos
-- Gestión de empresas
-- Autenticación segura
+### 📱 Integración WhatsApp
 
-### 4. Integración WhatsApp
-
-- Importación de conversaciones
+- Webhooks de YCloud
 - Manejo de archivos multimedia
-- Webhooks para mensajes entrantes
+- Sistema de stickers personalizados
+- Templates de mensajes
+
+### 🔐 Seguridad
+
+- Autenticación por sesiones
+- Control de acceso por roles
+- Validación de datos con Pydantic
+- Middleware CORS configurado
+
+## 📊 Monitoreo y Logs
+
+- Logs detallados de operaciones
+- Manejo de errores con HTTPException
+- Validación de datos de entrada
+- Respuestas estructuradas en JSON
 
 ## 🔧 Mantenimiento
 
-### Scripts de Utilidad
-
-- **`create_admin.py`** - Crear usuario administrador inicial
-- **`migrate_*.py`** - Scripts de migración de base de datos
-
-### Logs y Monitoreo
-
-- Logs detallados de operaciones
-- Manejo de errores con mensajes descriptivos
-- Validación de datos con Pydantic
-
-## 🚨 Solución de Problemas
-
-### Error 500 en Insights
-
-- Verificar que `GEMINI_API_KEY` esté configurada
-- Comprobar conexión a internet
-- Revisar logs del servidor
-
-### Problemas de Base de Datos
-
-- Verificar permisos de escritura en `/data/`
-- Ejecutar scripts de migración si es necesario
-- Comprobar integridad de la base SQLite
-
-## 📝 Notas de Desarrollo
-
-- **FastAPI** para APIs rápidas y documentación automática
-- **SQLAlchemy** para ORM robusto
-- **Pydantic** para validación de datos
-- **Google Gemini AI** para análisis de conversaciones
-- **WebSockets** para comunicación en tiempo real
+- Migraciones automáticas de base de datos
+- Verificación de integridad de tablas
+- Creación automática de directorios de media
+- Scripts de backup y restauración

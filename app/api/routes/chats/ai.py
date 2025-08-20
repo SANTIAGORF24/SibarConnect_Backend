@@ -1,28 +1,30 @@
 import json
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from app.db.session import get_db
 from app.services.chats import (
     get_messages_by_chat,
     save_chat_summary,
     get_chat_summary,
+    get_chat_by_id
 )
 from app.core.config import settings
-from google import genai as genai_client
+import google.genai as genai_client
 from google.genai import types as genai_types
 from app.schemas.chats.chat import (
     CreateSummaryRequest,
     ChatInsightsRequest,
     ChatInsightsOut,
     AssistDraftRequest,
-    AssistDraftOut,
+    AssistDraftOut
 )
 
-router = APIRouter()
+router = APIRouter(prefix="/ai")
 
+summaries_router = APIRouter()
 
-@router.post("/summaries/generate")
+@summaries_router.post("/summaries/generate")
 async def generate_summary_endpoint(
     data: CreateSummaryRequest,
     company_id: int,
@@ -84,7 +86,7 @@ async def generate_summary_endpoint(
     }
 
 
-@router.get("/summaries/{chat_id}")
+@summaries_router.get("/summaries/{chat_id}")
 def get_summary_endpoint(
     chat_id: int,
     company_id: int,
@@ -106,42 +108,101 @@ def get_summary_endpoint(
 
 @router.post("/insights", response_model=ChatInsightsOut)
 def chat_insights(payload: ChatInsightsRequest, company_id: int, db: Session = Depends(get_db)):
-    if payload.messages is not None and len(payload.messages) > 0:
-        text_msgs = [m for m in payload.messages if (m.message_type or 'text') == 'text' and m.content]
-    else:
-        msgs = get_messages_by_chat(db, payload.chat_id, limit=payload.limit)
-        text_msgs = [m for m in reversed(msgs) if (m.message_type or 'text') == 'text' and m.content]
-    if not text_msgs:
-        return ChatInsightsOut()
-    if not settings.gemini_api_key:
-        raise HTTPException(status_code=500, detail="GEMINI_API_KEY no configurada. Por favor, configura la variable de entorno GEMINI_API_KEY en el archivo .env")
-    system_prompt = (
-        "Rol: Analista de Conversaciones y Asistente Comercial.\n"
-        "Tarea: Analiza los mensajes (en español) y devuelve SOLO JSON válido con: "
-        "message_sentiments (lista de {id?, content?, sentiment in [positive,neutral,negative], score -1..1}), "
-        "chat_sentiment ({label,score,trend}), intents (lista), entities (lista de {type,value}), "
-        "suggested_actions (lista de {action,reason}), suggested_reply (string), candidate_replies (lista de 3 a 5 strings cortos en español, listos para enviar), "
-        "tone_warnings (lista), interest_probability (0..1), churn_risk (0..1).\n"
-        "NO uses markdown, NO fences, responde SOLO JSON."
-    )
-    user_payload_lines = []
-    for m in text_msgs[-100:]:
-        content = getattr(m, 'content', None) or (m.get('content') if isinstance(m, dict) else None)
-        direction = getattr(m, 'direction', None) or (m.get('direction') if isinstance(m, dict) else '')
-        role = 'user' if (direction or '').lower() == 'incoming' else 'agent'
-        if content:
-            user_payload_lines.append(f"[{role}] {content}")
-    user_prompt = (
-        "Mensajes recientes (máx. 100). Analiza sentimiento por mensaje y global; detecta intenciones (agendar, compra, soporte, etc.) y entidades (monto, fecha); sugiere siguientes mejores acciones; sugiere respuesta y advertencias de tono. Devuelve JSON.\n\n"
-        + "\n".join(user_payload_lines)
-    )
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
+        logger.info(f"🔍 Iniciando análisis de insights para chat_id: {payload.chat_id}, company_id: {company_id}")
+        logger.info(f"📊 Payload recibido: {payload}")
+        
+        if payload.messages is not None and len(payload.messages) > 0:
+            logger.info(f"📨 Usando mensajes del payload: {len(payload.messages)} mensajes")
+            text_msgs = [m for m in payload.messages if getattr(m, 'message_type', 'text') == 'text' and getattr(m, 'content', None)]
+        else:
+            logger.info(f"📥 Obteniendo mensajes de la base de datos para chat_id: {payload.chat_id}")
+            msgs = get_messages_by_chat(db, payload.chat_id, limit=payload.limit)
+            logger.info(f"📊 Mensajes obtenidos de BD: {len(msgs)} mensajes")
+            text_msgs = [m for m in reversed(msgs) if getattr(m, 'message_type', 'text') == 'text' and getattr(m, 'content', None)]
+        
+        logger.info(f"💬 Mensajes de texto filtrados: {len(text_msgs)} mensajes")
+        
+        if not text_msgs:
+            logger.info("⚠️ No hay mensajes de texto para analizar, retornando respuesta vacía")
+            return ChatInsightsOut()
+            
+        if not settings.gemini_api_key:
+            raise HTTPException(status_code=500, detail="GEMINI_API_KEY no configurada. Por favor, configura la variable de entorno GEMINI_API_KEY en el archivo .env")
+            
+        system_prompt = (
+            "Rol: Analista de Conversaciones y Asistente Comercial.\n"
+            "Tarea: Analiza los mensajes (en español) y devuelve SOLO JSON válido con: "
+            "message_sentiments (lista de {id?, content?, sentiment in [positive,neutral,negative], score -1..1}), "
+            "chat_sentiment ({label,score,trend}), intents (lista), entities (lista de {type,value}), "
+            "suggested_actions (lista de {action,reason}), suggested_reply (string), candidate_replies (lista de 3 a 5 strings cortos en español, listos para enviar), "
+            "tone_warnings (lista), interest_probability (0..1), churn_risk (0..1).\n"
+            "NO uses markdown, NO fences, responde SOLO JSON."
+        )
+        
+        user_payload_lines = []
+        for m in text_msgs[-100:]:
+            content = getattr(m, 'content', None)
+            direction = getattr(m, 'direction', None)
+            role = 'user' if direction and direction.lower() == 'incoming' else 'agent'
+            if content:
+                user_payload_lines.append(f"[{role}] {content}")
+                
+        user_prompt = (
+            "Mensajes recientes (máx. 100). Analiza sentimiento por mensaje y global; detecta intenciones (agendar, compra, soporte, etc.) y entidades (monto, fecha); sugiere siguientes mejores acciones; sugiere respuesta y advertencias de tono. Devuelve JSON.\n\n"
+            + "\n".join(user_payload_lines)
+        )
+        
+        logger.info(f"🤖 Enviando prompt a Gemini con {len(user_payload_lines)} mensajes")
+        logger.info(f"📝 Longitud del prompt: {len(user_prompt)} caracteres")
+        logger.info(f"📝 Primeros 200 caracteres del prompt: '{user_prompt[:200]}...'")
+        
         client = genai_client.Client(api_key=settings.gemini_api_key)
         contents = [genai_types.Content(role="user", parts=[genai_types.Part.from_text(text=user_prompt)])]
         config = genai_types.GenerateContentConfig(temperature=0, system_instruction=[genai_types.Part.from_text(text=system_prompt)])
-        resp = client.models.generate_content(model="gemini-2.5-flash", contents=contents, config=config)
+        resp = client.models.generate_content(model="gemini-1.5-flash", contents=contents, config=config)
+        
+        logger.info(f"🔍 Respuesta completa de Gemini: {resp}")
+        logger.info(f"🔍 Tipo de respuesta: {type(resp)}")
+        logger.info(f"🔍 Atributos de respuesta: {dir(resp)}")
+        
         raw_text = getattr(resp, "text", "") or ""
         text = raw_text.strip()
+        
+        logger.info(f"📝 Respuesta de Gemini recibida: {len(text)} caracteres")
+        logger.info(f"📝 Contenido de respuesta: '{text}'")
+        
+        if not text:
+            logger.error("❌ Gemini devolvió respuesta vacía")
+            logger.error("🔍 Intentando obtener más información del error...")
+            
+            # Intentar obtener información del error de la respuesta
+            if hasattr(resp, 'candidates') and resp.candidates:
+                candidate = resp.candidates[0]
+                if hasattr(candidate, 'finish_reason'):
+                    logger.error(f"🔍 Finish reason: {candidate.finish_reason}")
+                if hasattr(candidate, 'safety_ratings'):
+                    logger.error(f"🔍 Safety ratings: {candidate.safety_ratings}")
+            
+            # Intentar con un modelo alternativo
+            try:
+                logger.info("🔄 Intentando con modelo alternativo gemini-2.5-flash...")
+                resp_alt = client.models.generate_content(model="gemini-2.5-flash", contents=contents, config=config)
+                raw_text_alt = getattr(resp_alt, "text", "") or ""
+                text_alt = raw_text_alt.strip()
+                
+                if text_alt:
+                    logger.info("✅ Modelo alternativo funcionó")
+                    text = text_alt
+                else:
+                    raise HTTPException(status_code=500, detail="Gemini devolvió respuesta vacía con ambos modelos. Verifica la API key y la configuración.")
+            except Exception as alt_error:
+                logger.error(f"❌ Error con modelo alternativo: {alt_error}")
+                raise HTTPException(status_code=500, detail="Gemini devolvió respuesta vacía. Verifica la API key y el modelo.")
+        
         if text.startswith("```"):
             lines = text.splitlines()
             if lines and lines[0].startswith("```"):
@@ -149,15 +210,20 @@ def chat_insights(payload: ChatInsightsRequest, company_id: int, db: Session = D
             if lines and lines[-1].startswith("```"):
                 lines = lines[:-1]
             text = "\n".join(lines).strip()
+            
         import re
         candidate = text
         if not (candidate.startswith('{') and candidate.endswith('}')):
             match = re.search(r"\{[\s\S]*\}", text)
             if match:
                 candidate = match.group(0)
+                
+        logger.info(f"🔍 JSON candidato para parsear: '{candidate}'")
+        
         data = json.loads(candidate)
         if not isinstance(data, dict):
             raise ValueError("Respuesta JSON inválida (no dict)")
+            
         data.setdefault('message_sentiments', [])
         data.setdefault('chat_sentiment', None)
         data.setdefault('intents', [])
@@ -166,12 +232,18 @@ def chat_insights(payload: ChatInsightsRequest, company_id: int, db: Session = D
         data.setdefault('suggested_reply', None)
         data.setdefault('tone_warnings', [])
         data.setdefault('candidate_replies', [])
+        
+        logger.info("✅ Insights generados exitosamente")
         return data
+        
     except json.JSONDecodeError as e:
+        logger.error(f"❌ Error decodificando respuesta de Gemini: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error decodificando respuesta de Gemini: {str(e)}")
     except ValueError as e:
+        logger.error(f"❌ Error en formato de respuesta: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error en formato de respuesta: {str(e)}")
     except Exception as e:
+        logger.error(f"❌ Error inesperado generando insights: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error inesperado generando insights: {str(e)}")
 
 

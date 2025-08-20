@@ -6,7 +6,7 @@ from .appointments import router as appointments_router
 from .management import router as management_router
 from .imports import router as imports_router
 from .media import router as media_router
-from .ai import router as ai_router
+from .ai import router as ai_router, summaries_router
 from .realtime import router as realtime_router
 
 router = APIRouter()
@@ -18,6 +18,7 @@ router.include_router(imports_router)
 router.include_router(media_router)
 router.include_router(messages_router)
 router.include_router(start_router)
+router.include_router(summaries_router)
 router.include_router(ai_router)
 router.include_router(management_router)
 router.include_router(realtime_router)

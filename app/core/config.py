@@ -11,7 +11,7 @@ class Settings:
   api_prefix: str = os.getenv("API_PREFIX", "/api")
   server_url: str = os.getenv("SERVER_URL", "http://localhost:8000")
   # URL pública para recursos (usar ngrok cuando esté disponible)
-  public_url: str = os.getenv("PUBLIC_URL", os.getenv("SERVER_URL", "http://localhost:8000"))
+  public_url: str = os.getenv("PUBLIC_URL", "https://d79757fc9d41.ngrok-free.app")
   deepseek_api_key: str | None = os.getenv("DEEPSEEK_API_KEY")
   gemini_api_key: str | None = os.getenv("GEMINI_API_KEY")
 

@@ -192,11 +192,17 @@ async def handle_message_updated(payload: dict, db: Session):
     try:
         logger.info("🔄 Procesando actualización de mensaje")
         
-        message_data = payload.get('data', {})
-        message_id = message_data.get('id')
-        status = message_data.get('status')
+        # YCloud envía la información en whatsappMessage
+        whatsapp_message = payload.get('whatsappMessage', {})
+        message_id = whatsapp_message.get('id')
+        status = whatsapp_message.get('status')
+        error_code = whatsapp_message.get('errorCode')
+        error_message = whatsapp_message.get('errorMessage')
         
         logger.info(f"Mensaje {message_id} cambió a estado: {status}")
+        
+        if error_code and error_message:
+            logger.warning(f"❌ Error en mensaje {message_id}: {error_code} - {error_message}")
         
         # Estados posibles: sent, delivered, read, failed
         # Aquí puedes actualizar el estado del mensaje en tu base de datos

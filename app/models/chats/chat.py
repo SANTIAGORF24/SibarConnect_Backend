@@ -68,3 +68,61 @@ class Message(Base):
     # Relaciones
     chat = relationship("Chat", back_populates="messages")
     user = relationship("User")  # Usuario que envió el mensaje (si es outgoing)
+
+
+class ChatTag(Base):
+    __tablename__ = "chat_tags"
+
+    id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
+    name = Column(String(64), nullable=False)
+
+
+class ChatTagMap(Base):
+    __tablename__ = "chat_tag_map"
+
+    id = Column(Integer, primary_key=True, index=True)
+    chat_id = Column(Integer, ForeignKey("chats.id"), nullable=False)
+    tag_id = Column(Integer, ForeignKey("chat_tags.id"), nullable=False)
+
+
+class ChatNote(Base):
+    __tablename__ = "chat_notes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
+    chat_id = Column(Integer, ForeignKey("chats.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class ChatPin(Base):
+    __tablename__ = "chat_pins"
+
+    id = Column(Integer, primary_key=True, index=True)
+    chat_id = Column(Integer, ForeignKey("chats.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class ChatSnooze(Base):
+    __tablename__ = "chat_snoozes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    chat_id = Column(Integer, ForeignKey("chats.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    until_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class ChatAudit(Base):
+    __tablename__ = "chat_audit"
+
+    id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
+    chat_id = Column(Integer, ForeignKey("chats.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    action = Column(String(64), nullable=False)
+    details = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

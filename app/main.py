@@ -12,8 +12,7 @@ from .api.routes.roles.roles import router as roles_router
 from .api.routes.companies.companies import router as companies_router
 from .api.routes.companies.stickers import router as stickers_router
 from .api.routes.webhooks.ycloud import router as webhooks_router
-from .api.routes.chats.chats import router as chats_router
-from .api.routes.chats.realtime import router as chats_realtime_router
+from .api.routes.chats import router as chats_router
 from .api.routes.media import router as media_router
 from .api.routes.templates.templates import router as templates_router
 from sqlalchemy import text
@@ -194,10 +193,23 @@ def create_app() -> FastAPI:
     except Exception:
       pass
 
-  app = FastAPI(title=settings.app_name)
+  app = FastAPI(
+    title=settings.app_name,
+    openapi_tags=[
+      {"name": "Auth", "description": "Autenticación y sesiones"},
+      {"name": "Users", "description": "Gestión de usuarios"},
+      {"name": "Companies", "description": "Gestión de empresas"},
+      {"name": "Roles", "description": "Roles y permisos"},
+      {"name": "Chats", "description": "Operaciones de chats, mensajes y adjuntos"},
+      {"name": "Stickers", "description": "Gestión de stickers de empresa"},
+      {"name": "Webhooks", "description": "Webhooks de integración (YCloud)"},
+      {"name": "Media", "description": "Servir archivos multimedia"},
+      {"name": "Templates", "description": "Plantillas de contenido"},
+    ]
+  )
 
   # Endpoint específico para archivos webp con tipo MIME correcto (ANTES del mount)
-  @app.get("/media/{company_id}/stickers/{filename}")
+  @app.get("/media/{company_id}/stickers/{filename}", tags=["Media"])
   async def serve_sticker(company_id: str, filename: str):
     media_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "media")
     file_path = os.path.join(media_dir, company_id, "stickers", filename)
@@ -224,16 +236,15 @@ def create_app() -> FastAPI:
     allow_headers=["*"],
   )
 
-  app.include_router(auth_router, prefix=settings.api_prefix)
-  app.include_router(users_router, prefix=settings.api_prefix)
-  app.include_router(companies_router, prefix=settings.api_prefix)
-  app.include_router(roles_router, prefix=settings.api_prefix)
-  app.include_router(chats_router, prefix=f"{settings.api_prefix}/chats")
-  app.include_router(chats_realtime_router, prefix=f"{settings.api_prefix}/chats")
-  app.include_router(stickers_router, prefix=f"{settings.api_prefix}/chats/stickers")
-  app.include_router(webhooks_router, prefix=f"{settings.api_prefix}/webhooks")
-  app.include_router(media_router, prefix=settings.api_prefix)
-  app.include_router(templates_router, prefix=f"{settings.api_prefix}/templates")
+  app.include_router(auth_router, prefix=settings.api_prefix, tags=["Auth"])
+  app.include_router(users_router, prefix=settings.api_prefix, tags=["Users"])
+  app.include_router(companies_router, prefix=settings.api_prefix, tags=["Companies"])
+  app.include_router(roles_router, prefix=settings.api_prefix, tags=["Roles"])
+  app.include_router(chats_router, prefix=f"{settings.api_prefix}/chats", tags=["Chats"])
+  app.include_router(stickers_router, prefix=f"{settings.api_prefix}/chats/stickers", tags=["Stickers"])
+  app.include_router(webhooks_router, prefix=f"{settings.api_prefix}/webhooks", tags=["Webhooks"])
+  app.include_router(media_router, prefix=settings.api_prefix, tags=["Media"])
+  app.include_router(templates_router, prefix=f"{settings.api_prefix}/templates", tags=["Templates"])
 
   return app
 

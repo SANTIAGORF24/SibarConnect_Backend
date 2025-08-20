@@ -185,6 +185,40 @@ class YCloudService:
                 "success": False,
                 "error": "Timeout al enviar mensaje"
             }
+
+    async def send_template(self, to: str, from_number: str, template_name: str, language_code: str = "es", body_params: list[str] | None = None) -> Dict[str, Any]:
+        try:
+            payload = {
+                "to": to,
+                "from": from_number,
+                "type": "template",
+                "template": {
+                    "name": template_name,
+                    "language": {"code": language_code},
+                    "components": []
+                }
+            }
+            if body_params:
+                payload["template"]["components"].append({
+                    "type": "body",
+                    "parameters": [{"type": "text", "text": str(p)} for p in body_params]
+                })
+
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.BASE_URL}/whatsapp/messages",
+                    headers=self.headers,
+                    json=payload,
+                    timeout=10.0
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    return {"success": True, "message_id": data.get("id"), "response": data}
+                else:
+                    error_data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"error": response.text}
+                    return {"success": False, "error": f"Error {response.status_code}", "response": error_data}
+        except Exception as e:
+            return {"success": False, "error": f"Error inesperado: {str(e)}"}
         except httpx.RequestError as e:
             return {
                 "success": False,

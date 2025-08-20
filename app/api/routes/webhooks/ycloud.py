@@ -4,6 +4,7 @@ from app.db.session import get_db
 from app.services.chats import get_or_create_chat, create_message
 from app.services.media_handler import media_handler
 from app.schemas.chats.chat import MessageCreate
+from app.services.realtime import manager
 from app.models.companies.company import Company
 import json
 import logging
@@ -168,6 +169,13 @@ async def handle_inbound_message(payload: dict, db: Session):
         
         message = create_message(db, message_data)
         logger.info(f"✅ Mensaje guardado con ID: {message.id}")
+        try:
+            await manager.broadcast_to_company(company.id, "chat.updated", {
+                "chat_id": chat.id,
+                "company_id": company.id
+            })
+        except Exception as be:
+            logger.warning(f"No se pudo emitir chat.updated: {be}")
         
         # TODO: Aquí puedes agregar:
         # 1. Respuestas automáticas

@@ -2,6 +2,7 @@ import httpx
 import json
 from typing import Dict, Any
 from app.schemas.companies.company import YCloudTestResult
+from app.core.config import settings
 
 
 class YCloudService:
@@ -101,7 +102,7 @@ class YCloudService:
             response.raise_for_status()
             return response.json()
     
-    async def send_message(self, to: str, message: str, from_number: str, message_type: str = "text") -> Dict[str, Any]:
+    async def send_message(self, to: str, message: str, from_number: str, message_type: str = "text", caption: str | None = None) -> Dict[str, Any]:
         """Envía un mensaje de WhatsApp"""
         try:
             # Formatear número de teléfono (asegurar que tenga formato internacional)
@@ -121,11 +122,33 @@ class YCloudService:
                 payload["text"] = {
                     "body": message
                 }
-            else:
-                # Para otros tipos de mensajes en el futuro
-                payload["text"] = {
-                    "body": message
+            elif message_type == "sticker":
+                # Para stickers, convertir ruta local a URL pública accesible
+                sticker_url = message
+                if message.startswith('/media/'):
+                    # Convertir ruta local a URL pública (ngrok)
+                    sticker_url = f"{settings.public_url}{message}"
+                elif not message.startswith(('http://', 'https://')):
+                    # Si no es una URL completa, asumir que es ruta local
+                    sticker_url = f"{settings.public_url}{message}"
+                
+                print(f"🔗 Sticker URL construida: {sticker_url}")
+                
+                payload["sticker"] = {
+                    "link": sticker_url
                 }
+            elif message_type in ("image", "video", "audio", "document"):
+                media_url = message
+                if message.startswith('/media/'):
+                    media_url = f"{settings.public_url}{message}"
+                elif not message.startswith(('http://', 'https://')):
+                    media_url = f"{settings.public_url}{message}"
+                payload[message_type] = {"link": media_url}
+                if caption:
+                    # YCloud soporta caption en image/video/audio/document
+                    payload[message_type]["caption"] = caption
+            else:
+                payload["text"] = {"body": message}
             
             print(f"Enviando mensaje desde {from_number} a {to}: {message}")
             print(f"Payload: {json.dumps(payload, indent=2)}")
@@ -162,6 +185,40 @@ class YCloudService:
                 "success": False,
                 "error": "Timeout al enviar mensaje"
             }
+
+    async def send_template(self, to: str, from_number: str, template_name: str, language_code: str = "es", body_params: list[str] | None = None) -> Dict[str, Any]:
+        try:
+            payload = {
+                "to": to,
+                "from": from_number,
+                "type": "template",
+                "template": {
+                    "name": template_name,
+                    "language": {"code": language_code},
+                    "components": []
+                }
+            }
+            if body_params:
+                payload["template"]["components"].append({
+                    "type": "body",
+                    "parameters": [{"type": "text", "text": str(p)} for p in body_params]
+                })
+
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.BASE_URL}/whatsapp/messages",
+                    headers=self.headers,
+                    json=payload,
+                    timeout=10.0
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    return {"success": True, "message_id": data.get("id"), "response": data}
+                else:
+                    error_data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"error": response.text}
+                    return {"success": False, "error": f"Error {response.status_code}", "response": error_data}
+        except Exception as e:
+            return {"success": False, "error": f"Error inesperado: {str(e)}"}
         except httpx.RequestError as e:
             return {
                 "success": False,
